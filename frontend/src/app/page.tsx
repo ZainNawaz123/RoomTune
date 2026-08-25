@@ -1,10 +1,13 @@
 "use client";
 
+import { useMemo } from "react";
+import { DirectSoundPanel } from "@/components/DirectSoundPanel";
 import { Header } from "@/components/Header";
 import { ObjectInspector } from "@/components/ObjectInspector";
 import { RoomCanvas } from "@/components/RoomCanvas";
 import { RoomControls } from "@/components/RoomControls";
 import { useRoomState } from "@/hooks/useRoomState";
+import { runDirectSound } from "@/lib/runDirectSound";
 
 export default function Home() {
   const {
@@ -17,6 +20,8 @@ export default function Home() {
     selectObject,
     resetRoom,
   } = useRoomState();
+
+  const directSound = useMemo(() => runDirectSound(room, objects), [room, objects]);
 
   return (
     <div className="flex h-screen flex-col bg-neutral-950 text-neutral-100">
@@ -36,6 +41,7 @@ export default function Home() {
         <aside className="flex w-full flex-col gap-4 lg:w-80 lg:shrink-0">
           <RoomControls room={room} onChangeDimension={updateRoomDimension} />
           <ObjectInspector object={selectedObject} />
+          <DirectSoundPanel view={directSound} />
         </aside>
       </div>
     </div>

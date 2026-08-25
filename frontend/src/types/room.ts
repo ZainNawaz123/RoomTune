@@ -6,7 +6,8 @@
  * `src/lib/coordinates.ts`) and never leak into application state.
  */
 
-/** A physical position within the room, in meters. */
+/** A physical position within the room, in meters. Floor-plan (x, y) only;
+ * height is supplied as z when calling the 3D simulation engine. */
 export interface Position {
   x: number;
   y: number;

@@ -56,7 +56,10 @@ export function computeRoomLayout(
   return { scale, offsetX, offsetY, roomPixelWidth, roomPixelHeight };
 }
 
-/** Converts a physical position (meters) to a pixel position using `layout`. */
+/** Converts a physical position (meters) to a pixel position using `layout`.
+ * Simulation x/y are the same meters the acoustic engine uses. SVG y grows
+ * downward, so larger physical y appears lower on screen; z is not drawn.
+ */
 export function meterToPixel(position: Position, layout: RoomLayout): Position {
   return {
     x: layout.offsetX + position.x * layout.scale,

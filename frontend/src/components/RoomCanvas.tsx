@@ -21,9 +21,9 @@ const CANVAS_PADDING = 44;
  * Renders the room as SVG and hosts the draggable objects inside it.
  *
  * This component only knows how to turn a room + object list into pixels;
- * it has no acoustic knowledge. Direct sound paths, reflections, heatmaps,
- * etc. can later be added as additional SVG layers between the boundary and
- * the object markers without touching this coordinate/layout logic.
+ * it has no acoustic knowledge. The dashed speaker-to-listener segment is
+ * only a floor-plan overlay of the same meter-space positions the backend
+ * uses; delay/distance are computed by `@roomtune/simulation`, not here.
  */
 export function RoomCanvas({ room, objects, selectedObjectId, onSelectObject, onMoveObject }: RoomCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -90,6 +90,8 @@ export function RoomCanvas({ room, objects, selectedObjectId, onSelectObject, on
 
           <RoomDimensionLabels room={room} layout={layout} />
 
+          <DirectSoundPath objects={objects} layout={layout} />
+
           {objects.map((object) => (
             <ObjectMarker
               key={object.id}
@@ -109,6 +111,29 @@ export function RoomCanvas({ room, objects, selectedObjectId, onSelectObject, on
 interface RoomDimensionLabelsProps {
   room: RoomDimensions;
   layout: RoomLayout;
+}
+
+function DirectSoundPath({ objects, layout }: { objects: RoomObject[]; layout: RoomLayout }) {
+  const speaker = objects.find((object) => object.kind === "speaker");
+  const listener = objects.find((object) => object.kind === "listener");
+  if (!speaker || !listener) return null;
+
+  const from = meterToPixel(speaker.position, layout);
+  const to = meterToPixel(listener.position, layout);
+
+  return (
+    <line
+      x1={from.x}
+      y1={from.y}
+      x2={to.x}
+      y2={to.y}
+      className="stroke-sky-400/40"
+      strokeWidth={1.5}
+      strokeDasharray="6 4"
+      vectorEffect="non-scaling-stroke"
+      pointerEvents="none"
+    />
+  );
 }
 
 function RoomDimensionLabels({ room, layout }: RoomDimensionLabelsProps) {
