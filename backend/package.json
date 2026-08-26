@@ -7,6 +7,11 @@
     ".": "./src/simulation/index.ts"
   },
   "scripts": {
-    "test": "node --test src/simulation/directSound.test.ts"
+    "test": "node --test src/simulation/directSound.test.ts src/acoustics/materials.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26.3.0",
+    "typescript": "^7.0.2"
   }
 }
