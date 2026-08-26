@@ -12,8 +12,12 @@ import { SimulationValidationError } from "./validate.ts";
 
 const DRYWALL_ALPHA: BandValues = [0.3, 0.12, 0.08, 0.06, 0.06, 0.05];
 const VINYL_ALPHA: BandValues = [0.02, 0.02, 0.03, 0.04, 0.04, 0.05];
-const DRYWALL_REFLECTION: BandValues = [0.7, 0.88, 0.92, 0.94, 0.94, 0.95];
-const VINYL_REFLECTION: BandValues = [0.98, 0.98, 0.97, 0.96, 0.96, 0.95];
+// Energy reflection coefficient, 1 - alpha (fraction of incident ENERGY reflected).
+const DRYWALL_ENERGY_REFLECTION: BandValues = [0.7, 0.88, 0.92, 0.94, 0.94, 0.95];
+const VINYL_ENERGY_REFLECTION: BandValues = [0.98, 0.98, 0.97, 0.96, 0.96, 0.95];
+// Pressure reflection magnitude, sqrt(1 - alpha) — the correct amplitude multiplier.
+const DRYWALL_PRESSURE_REFLECTION: BandValues = DRYWALL_ENERGY_REFLECTION.map(Math.sqrt) as unknown as BandValues;
+const VINYL_PRESSURE_REFLECTION: BandValues = VINYL_ENERGY_REFLECTION.map(Math.sqrt) as unknown as BandValues;
 
 const stubResolver: AbsorptionResolver = (materialId) => {
   if (materialId === "drywall_standard") return DRYWALL_ALPHA;
@@ -50,7 +54,8 @@ test("returns 1 direct + 6 reflections, each with 6 band amplitudes", () => {
     assert.equal(reflection.kind, "reflection");
     assert.equal(reflection.amplitudeByBand.length, 6);
     assert.equal(reflection.absorptionByBand.length, 6);
-    assert.equal(reflection.reflectionFactorByBand.length, 6);
+    assert.equal(reflection.energyReflectionCoefficientByBand.length, 6);
+    assert.equal(reflection.pressureReflectionMagnitudeByBand.length, 6);
   }
 
   const totalAmplitudes =
@@ -91,12 +96,22 @@ test("default materials: drywall walls/ceiling, vinyl floor", () => {
   for (const surface of ["north", "south", "east", "west", "ceiling"] as const) {
     const path = result.reflections.find((r) => r.surface === surface)!;
     assert.equal(path.materialId, DEFAULT_SURFACE_MATERIAL_IDS[surface]);
-    assert.deepEqual(path.reflectionFactorByBand, DRYWALL_REFLECTION);
+    assert.deepEqual(path.energyReflectionCoefficientByBand, DRYWALL_ENERGY_REFLECTION);
+    for (let b = 0; b < 6; b += 1) {
+      assert.ok(
+        Math.abs(path.pressureReflectionMagnitudeByBand[b] - DRYWALL_PRESSURE_REFLECTION[b]) < 1e-12,
+      );
+    }
   }
 
   const floor = result.reflections.find((r) => r.surface === "floor")!;
   assert.equal(floor.materialId, "vinyl_linoleum_floor");
-  assert.deepEqual(floor.reflectionFactorByBand, VINYL_REFLECTION);
+  assert.deepEqual(floor.energyReflectionCoefficientByBand, VINYL_ENERGY_REFLECTION);
+  for (let b = 0; b < 6; b += 1) {
+    assert.ok(
+      Math.abs(floor.pressureReflectionMagnitudeByBand[b] - VINYL_PRESSURE_REFLECTION[b]) < 1e-12,
+    );
+  }
 });
 
 test("explicit room.surfaces overrides defaults", () => {
@@ -121,12 +136,18 @@ test("explicit room.surfaces overrides defaults", () => {
   assert.equal(floor.materialId, "carpet_standard_9mm");
   const carpetAlpha: BandValues = [0.08, 0.08, 0.3, 0.6, 0.75, 0.8];
   for (let b = 0; b < 6; b += 1) {
-    assert.ok(Math.abs(floor.reflectionFactorByBand[b] - (1 - carpetAlpha[b])) < 1e-12);
+    assert.ok(
+      Math.abs(floor.energyReflectionCoefficientByBand[b] - (1 - carpetAlpha[b])) < 1e-12,
+    );
+    assert.ok(
+      Math.abs(floor.pressureReflectionMagnitudeByBand[b] - Math.sqrt(1 - carpetAlpha[b])) < 1e-12,
+    );
   }
 
   const west = result.reflections.find((r) => r.surface === "west")!;
   assert.equal(west.materialId, "fully_absorptive");
-  assert.deepEqual(west.reflectionFactorByBand, [0, 0, 0, 0, 0, 0]);
+  assert.deepEqual(west.energyReflectionCoefficientByBand, [0, 0, 0, 0, 0, 0]);
+  assert.deepEqual(west.pressureReflectionMagnitudeByBand, [0, 0, 0, 0, 0, 0]);
   assert.deepEqual(west.amplitudeByBand, [0, 0, 0, 0, 0, 0]);
 });
 
@@ -188,6 +209,76 @@ test("rejects coincident speaker and listener", () => {
       }),
     SimulationValidationError,
   );
+});
+
+test("pressure amplitude uses sqrt(1 - alpha), not (1 - alpha) directly", () => {
+  // 3m x 3m room, speaker (1,1), listener (2,1): north-wall image source is
+  // at (1,-1), giving distance sqrt((2-1)^2 + (1-(-1))^2) = sqrt(5).
+  const room: SimulationInput["room"] = { width: 3, length: 3, height: 3 };
+  const speaker = { position: { x: 1, y: 1, z: 1.5 } };
+  const listener = { position: { x: 2, y: 1, z: 1.5 } };
+
+  const energyReflection070: AbsorptionResolver = () => [0.3, 0.3, 0.3, 0.3, 0.3, 0.3];
+  const result070 = calculateFirstOrderReflections(
+    { room, speaker, listener },
+    { resolveAbsorption: energyReflection070 },
+  );
+  const north070 = result070.reflections.find((r) => r.surface === "north")!;
+
+  const expectedDistance = Math.sqrt(5);
+  const expectedDistanceFactor = 1 / expectedDistance;
+  const expectedPressureReflection070 = Math.sqrt(0.7);
+  const expectedAmplitude070 = expectedDistanceFactor * expectedPressureReflection070;
+
+  assert.ok(Math.abs(north070.distanceMeters - expectedDistance) < 1e-9);
+  assert.ok(Math.abs(north070.distanceFactor - expectedDistanceFactor) < 1e-9);
+  for (let b = 0; b < 6; b += 1) {
+    assert.ok(Math.abs(north070.energyReflectionCoefficientByBand[b] - 0.7) < 1e-12);
+    assert.ok(
+      Math.abs(north070.pressureReflectionMagnitudeByBand[b] - expectedPressureReflection070) <
+        1e-12,
+    );
+    assert.ok(Math.abs(north070.amplitudeByBand[b] - expectedAmplitude070) < 1e-9);
+    // The incorrect formula (distanceFactor * (1 - alpha)) would give ~0.3130,
+    // not the correct ~0.3742 — make sure we're not accidentally matching it.
+    const incorrectAmplitude = expectedDistanceFactor * 0.7;
+    assert.ok(Math.abs(north070.amplitudeByBand[b] - incorrectAmplitude) > 1e-3);
+  }
+  assert.ok(Math.abs(expectedAmplitude070 - 0.3742) < 1e-3);
+
+  const energyReflection088: AbsorptionResolver = () => [0.12, 0.12, 0.12, 0.12, 0.12, 0.12];
+  const result088 = calculateFirstOrderReflections(
+    { room, speaker, listener },
+    { resolveAbsorption: energyReflection088 },
+  );
+  const north088 = result088.reflections.find((r) => r.surface === "north")!;
+  const expectedPressureReflection088 = Math.sqrt(0.88);
+  const expectedAmplitude088 = expectedDistanceFactor * expectedPressureReflection088;
+
+  for (let b = 0; b < 6; b += 1) {
+    assert.ok(Math.abs(north088.amplitudeByBand[b] - expectedAmplitude088) < 1e-9);
+  }
+  assert.ok(Math.abs(expectedAmplitude088 - 0.4195) < 1e-3);
+});
+
+test("energy summing squares pressure amplitudes without reapplying (1 - alpha)", () => {
+  const room: SimulationInput["room"] = { width: 3, length: 3, height: 3 };
+  const speaker = { position: { x: 1, y: 1, z: 1.5 } };
+  const listener = { position: { x: 2, y: 1, z: 1.5 } };
+  const resolver: AbsorptionResolver = () => [0.3, 0.3, 0.3, 0.3, 0.3, 0.3];
+
+  const result = calculateFirstOrderReflections(
+    { room, speaker, listener },
+    { resolveAbsorption: resolver },
+  );
+  const north = result.reflections.find((r) => r.surface === "north")!;
+
+  // Squaring the (correct) pressure amplitude should restore distanceFactor^2 * (1 - alpha),
+  // i.e. the energy reflection fraction exactly once — not (1 - alpha)^2.
+  for (let b = 0; b < 6; b += 1) {
+    const expectedEnergyContribution = north.distanceFactor ** 2 * 0.7;
+    assert.ok(Math.abs(north.amplitudeByBand[b] ** 2 - expectedEnergyContribution) < 1e-9);
+  }
 });
 
 test("direct path amplitude equals 1/d with no reflection factor", () => {

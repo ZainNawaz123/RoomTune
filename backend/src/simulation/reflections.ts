@@ -23,7 +23,12 @@ function fillBand(value: number): BandValues {
   return [value, value, value, value, value, value];
 }
 
-function reflectionFactorsFromAbsorption(absorption: BandValues): BandValues {
+/**
+ * Energy reflection coefficient per band, `1 - alpha`: the fraction of
+ * incident acoustic ENERGY reflected. Not a pressure-amplitude multiplier —
+ * see {@link pressureReflectionMagnitudesFromEnergyReflection}.
+ */
+function energyReflectionCoefficientsFromAbsorption(absorption: BandValues): BandValues {
   return [
     1 - absorption[0],
     1 - absorption[1],
@@ -31,6 +36,25 @@ function reflectionFactorsFromAbsorption(absorption: BandValues): BandValues {
     1 - absorption[3],
     1 - absorption[4],
     1 - absorption[5],
+  ];
+}
+
+/**
+ * Pressure reflection magnitude per band, `sqrt(1 - alpha)`. This is the
+ * correct multiplier for PRESSURE amplitude `A`, so that energy summing
+ * (`sum(A^2)`) restores the energy reflection fraction `1 - alpha` exactly
+ * once rather than squaring it again.
+ */
+function pressureReflectionMagnitudesFromEnergyReflection(
+  energyReflectionByBand: BandValues,
+): BandValues {
+  return [
+    Math.sqrt(energyReflectionByBand[0]),
+    Math.sqrt(energyReflectionByBand[1]),
+    Math.sqrt(energyReflectionByBand[2]),
+    Math.sqrt(energyReflectionByBand[3]),
+    Math.sqrt(energyReflectionByBand[4]),
+    Math.sqrt(energyReflectionByBand[5]),
   ];
 }
 
@@ -49,8 +73,15 @@ function scaleBands(factors: BandValues, scale: number): BandValues {
  * First-order image-source reflections: one direct path plus six single-bounce
  * paths (one per room face), each with a 6-band amplitude array.
  *
- * Per-band totals use energy summing:
- *   E(b) = sum_i a_i(b)^2
+ * `amplitudeByBand` is a PRESSURE amplitude:
+ *   direct:     A(b) = distanceFactor
+ *   reflection: A(b) = distanceFactor * sqrt(1 - alpha(b))
+ *
+ * The absorption coefficient `alpha` is an ENERGY quantity, so `1 - alpha` is
+ * the energy reflection fraction, not a pressure multiplier — the pressure
+ * multiplier is its square root (see {@link pressureReflectionMagnitudesFromEnergyReflection}).
+ * This keeps per-band totals, computed via energy summing, physically correct:
+ *   E(b) = sum_i A_i(b)^2 = sum_i distanceFactor_i^2 * (1 - alpha_i(b))
  *   A(b) = sqrt(E(b))
  *
  * Absorption is supplied via {@link options.resolveAbsorption} so this module
@@ -94,8 +125,12 @@ export function calculateFirstOrderReflections(
     const materialId =
       room.surfaces?.[surface]?.materialId ?? DEFAULT_SURFACE_MATERIAL_IDS[surface];
     const absorptionByBand = options.resolveAbsorption(materialId);
-    const reflectionFactorByBand = reflectionFactorsFromAbsorption(absorptionByBand);
-    const amplitudeByBand = scaleBands(reflectionFactorByBand, distanceFactor);
+    const energyReflectionCoefficientByBand =
+      energyReflectionCoefficientsFromAbsorption(absorptionByBand);
+    const pressureReflectionMagnitudeByBand = pressureReflectionMagnitudesFromEnergyReflection(
+      energyReflectionCoefficientByBand,
+    );
+    const amplitudeByBand = scaleBands(pressureReflectionMagnitudeByBand, distanceFactor);
 
     return {
       kind: "reflection",
@@ -108,7 +143,8 @@ export function calculateFirstOrderReflections(
       delayMilliseconds: delaySeconds * 1000,
       distanceFactor,
       absorptionByBand,
-      reflectionFactorByBand,
+      energyReflectionCoefficientByBand,
+      pressureReflectionMagnitudeByBand,
       amplitudeByBand,
     };
   });

@@ -24,7 +24,7 @@ function PathAmplitudeRows({
   distanceMeters,
   delayMilliseconds,
   distanceFactor,
-  reflectionFactorByBand,
+  energyReflectionCoefficientByBand,
   amplitudeByBand,
 }: {
   label: string;
@@ -32,7 +32,7 @@ function PathAmplitudeRows({
   distanceMeters: number;
   delayMilliseconds: number;
   distanceFactor: number;
-  reflectionFactorByBand?: BandValues;
+  energyReflectionCoefficientByBand?: BandValues;
   amplitudeByBand: BandValues;
 }) {
   return (
@@ -48,8 +48,8 @@ function PathAmplitudeRows({
       <td className="py-2 pr-3 text-right tabular-nums">{distanceMeters.toFixed(3)}</td>
       <td className="py-2 pr-3 text-right tabular-nums">{delayMilliseconds.toFixed(2)}</td>
       <td className="py-2 pr-3 text-right tabular-nums">{distanceFactor.toFixed(4)}</td>
-      {reflectionFactorByBand
-        ? formatBandRow(reflectionFactorByBand).map((cell, index) => (
+      {energyReflectionCoefficientByBand
+        ? formatBandRow(energyReflectionCoefficientByBand).map((cell, index) => (
             <td key={`r-${index}`} className="py-2 pr-3 text-right tabular-nums text-neutral-400">
               {cell}
             </td>
@@ -155,14 +155,15 @@ function PathsTable({
               distanceMeters={path.distanceMeters}
               delayMilliseconds={path.delayMilliseconds}
               distanceFactor={path.distanceFactor}
-              reflectionFactorByBand={path.reflectionFactorByBand}
+              energyReflectionCoefficientByBand={path.energyReflectionCoefficientByBand}
               amplitudeByBand={path.amplitudeByBand}
             />
           ))}
         </tbody>
       </table>
       <p className="mt-2 text-[11px] text-neutral-600">
-        R = reflection factor (1 − α) per band. A = amplitude = (1/d) × R (direct uses R = 1).
+        R = energy reflection coefficient (1 − α) per band. A = pressure amplitude = (1/d) ×
+        √R (direct uses R = 1).
       </p>
     </div>
   );

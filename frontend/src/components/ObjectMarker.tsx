@@ -64,9 +64,9 @@ export function ObjectMarker({ object, layout, isSelected, onSelect, onMove }: O
       tabIndex={-1}
     >
       {object.kind === "speaker" ? (
-        <SpeakerIcon selected={isSelected} />
-      ) : (
         <ListenerIcon selected={isSelected} />
+      ) : (
+        <SpeakerIcon selected={isSelected} />
       )}
     </g>
   );

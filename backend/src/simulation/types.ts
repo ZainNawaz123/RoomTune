@@ -145,7 +145,20 @@ export type ReflectionPropagationPath = {
   delayMilliseconds: number;
   distanceFactor: number;
   absorptionByBand: BandValues;
-  reflectionFactorByBand: BandValues;
+  /**
+   * Energy reflection coefficient per band, `1 - alpha`: the fraction of
+   * incident acoustic ENERGY reflected by the surface. This is what the UI's
+   * "R" column displays. Do not use this directly as a pressure-amplitude
+   * multiplier — see {@link pressureReflectionMagnitudeByBand}.
+   */
+  energyReflectionCoefficientByBand: BandValues;
+  /**
+   * Pressure reflection magnitude per band, `sqrt(1 - alpha)`. `amplitudeByBand`
+   * (a PRESSURE amplitude) is `distanceFactor * pressureReflectionMagnitude`, so
+   * that squaring it during energy summing restores the correct energy
+   * reflection fraction `1 - alpha` rather than `(1 - alpha)^2`.
+   */
+  pressureReflectionMagnitudeByBand: BandValues;
   amplitudeByBand: BandValues;
 };
 
