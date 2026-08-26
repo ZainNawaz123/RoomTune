@@ -86,3 +86,77 @@ export interface SimulationResult {
   /** Same delay expressed in milliseconds. */
   propagationDelayMilliseconds: number;
 }
+
+/** Octave-band center frequencies used by the first-order reflection model. */
+export const BAND_FREQUENCIES_HZ = [125, 250, 500, 1000, 2000, 4000] as const;
+
+/** Reference distance for inverse-distance attenuation (1 m). */
+export const REFERENCE_DISTANCE_M = 1;
+
+/** Six absorption / reflection / amplitude values, one per {@link BAND_FREQUENCIES_HZ}. */
+export type BandValues = readonly [number, number, number, number, number, number];
+
+/**
+ * Default material ids when `Room.surfaces` omits a surface.
+ * Walls and ceiling use drywall; floor uses vinyl/linoleum on concrete.
+ */
+export const DEFAULT_SURFACE_MATERIAL_IDS: Readonly<Record<RoomSurfaceId, string>> = {
+  north: "drywall_standard",
+  south: "drywall_standard",
+  east: "drywall_standard",
+  west: "drywall_standard",
+  ceiling: "drywall_standard",
+  floor: "vinyl_linoleum_floor",
+};
+
+/**
+ * Injected so the simulation layer never touches the filesystem.
+ * Returns absorption coefficients (alpha) at the six bands, ascending.
+ */
+export type AbsorptionResolver = (materialId: string) => BandValues;
+
+/** Fixed iteration order for the six room surfaces. */
+export const ROOM_SURFACE_IDS: readonly RoomSurfaceId[] = [
+  "north",
+  "south",
+  "east",
+  "west",
+  "floor",
+  "ceiling",
+];
+
+export type DirectPropagationPath = {
+  kind: "direct";
+  distanceMeters: number;
+  delaySeconds: number;
+  delayMilliseconds: number;
+  distanceFactor: number;
+  amplitudeByBand: BandValues;
+};
+
+export type ReflectionPropagationPath = {
+  kind: "reflection";
+  surface: RoomSurfaceId;
+  materialId: string;
+  imageSourcePosition: Point3D;
+  reflectionPoint: Point3D;
+  distanceMeters: number;
+  delaySeconds: number;
+  delayMilliseconds: number;
+  distanceFactor: number;
+  absorptionByBand: BandValues;
+  reflectionFactorByBand: BandValues;
+  amplitudeByBand: BandValues;
+};
+
+export type PropagationPath = DirectPropagationPath | ReflectionPropagationPath;
+
+export interface FirstOrderReflectionResult {
+  direct: DirectPropagationPath;
+  /** Exactly six first-order reflections, in {@link ROOM_SURFACE_IDS} order. */
+  reflections: ReflectionPropagationPath[];
+  /** Sum of squared path amplitudes per band (energy). */
+  totalEnergyByBand: BandValues;
+  /** sqrt of {@link totalEnergyByBand} (amplitude scale). */
+  totalAmplitudeByBand: BandValues;
+}

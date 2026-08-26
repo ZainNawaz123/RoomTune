@@ -1,5 +1,6 @@
 import { SPEED_OF_SOUND_M_PER_S } from "./types.ts";
 import type { SimulationInput, SimulationResult } from "./types.ts";
+import { distanceMeters } from "./geometry.ts";
 import { validateSimulationInput } from "./validate.ts";
 
 /**
@@ -16,11 +17,7 @@ import { validateSimulationInput } from "./validate.ts";
 export function calculateDirectSound(input: SimulationInput): SimulationResult {
   validateSimulationInput(input);
 
-  const dx = input.speaker.position.x - input.listener.position.x;
-  const dy = input.speaker.position.y - input.listener.position.y;
-  const dz = input.speaker.position.z - input.listener.position.z;
-
-  const directDistanceMeters = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  const directDistanceMeters = distanceMeters(input.speaker.position, input.listener.position);
   const propagationDelaySeconds = directDistanceMeters / SPEED_OF_SOUND_M_PER_S;
   const propagationDelayMilliseconds = propagationDelaySeconds * 1000;
 

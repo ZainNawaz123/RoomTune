@@ -7,7 +7,7 @@
     ".": "./src/simulation/index.ts"
   },
   "scripts": {
-    "test": "node --test src/simulation/directSound.test.ts src/acoustics/materials.test.ts",
+    "test": "node --test src/simulation/directSound.test.ts src/simulation/geometry.test.ts src/simulation/reflections.test.ts src/acoustics/materials.test.ts src/acoustics/absorptionResolver.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
